@@ -18,8 +18,13 @@ let wait = async(t) => await new Promise(resolve => setTimeout(resolve, t));
     let init = () => {
         let stl=document.createElement("style");
         stl.innerHTML=`
-            .p-channel_sidebar__channel--unread {
+            .p-channel_sidebar__channel--unread,
+            .p-channel_sidebar__channel--unread.p-channel_sidebar__channel--selected {
                 background-color: lightgray;
+            }
+            .p-ia4_channel_list .p-channel_sidebar__channel--selected:not(.p-channel_sidebar__channel--unread),
+            .p-ia4_channel_list .p-channel_sidebar__channel--selected:not(.p-channel_sidebar__channel--unread):hover {
+                background-color: #8d7edc;
             }
             .ta__channel-panel {
                 position: absolute;
@@ -31,7 +36,7 @@ let wait = async(t) => await new Promise(resolve => setTimeout(resolve, t));
                 display: flex;
                 gap: 2px;
                 color: white;
-                border-radius: 3px;
+                border-radius: 4px;
             }
             .ta__channel-panel .ta__mentor-name {
                 position: relative;
