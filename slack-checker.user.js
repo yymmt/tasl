@@ -33,6 +33,9 @@ let wait = async(t) => await new Promise(resolve => setTimeout(resolve, t));
             .p-ia4_channel_list .p-channel_sidebar__channel--selected:not(.p-channel_sidebar__channel--unread):hover {
                 background-color: #8d7edc;
             }
+            .ta__other-time-kbn {
+                opacity:0.5;
+            }
             .ta__channel-panel {
                 position: absolute;
                 top: 1px;
@@ -122,13 +125,11 @@ let wait = async(t) => await new Promise(resolve => setTimeout(resolve, t));
                 `;
                 let onclick = (sel,f) => {
                     query(sel,panel)[0].addEventListener("click",e=>{
-                        f();
-                        updateSide(elm);
-                        saveLocalStorage();
+                        updateSideAndSaveIfChange(elm,ch,f);
                     });
                 }
-                onclick(".ta__unsolved-icon",()=>{ ch.isSolved=false; updateIsTimeout(elm); });
-                onclick(".ta__solved-icon",()=>{ ch.isSolved=true; ch.isTimeout=false; });
+                onclick(".ta__unsolved-icon",()=>{ ch.isSolved=false; updateIsTimeout(ch); });
+                onclick(".ta__solved-icon",()=>{ ch.isSolved=true; updateIsTimeout(ch); });
                 onclick(".ta__warning-icon",()=>{ ch.isWarning=!ch.isWarning; });
                 parent.appendChild(panel);
             }
@@ -142,7 +143,16 @@ let wait = async(t) => await new Promise(resolve => setTimeout(resolve, t));
             setEnable(".ta__solved-icon",ch.isSolved);
             setEnable(".ta__timeout-icon",ch.isTimeout);
             setEnable(".ta__warning-icon",ch.isWarning);
+            elm.classList[ch.isOtherTimeKbn?"add":"remove"]("ta__other-time-kbn");
             query(".ta__mentor-name",panel)[0].textContent=ch.mentor.replace(/mentor-/,"");
+        }
+    }
+    let updateSideAndSaveIfChange = (elm,ch,f) => {
+        let bk={...ch};
+        f();
+        if(Object.keys(ch).some(k=>ch[k]!=bk[k])) {
+            if(elm) { updateSide(elm); }
+            saveLocalStorage();
         }
     }
     let updateSideAll = () => {
@@ -151,13 +161,15 @@ let wait = async(t) => await new Promise(resolve => setTimeout(resolve, t));
             updateSide(elm);
         }
     }
-    let updateIsTimeout = elm => {
-        let cn=elm.textContent;
-        let ch=data[cn];
-        if(ch) {
-            ch.isTimeout=ch.isSolved?false : (new Date().getTime()/1000  - ch.ts) > 5*60;
-        }
+    let updateIsTimeout = ch => {
+        ch.isTimeout=ch.isSolved?false : (new Date().getTime()/1000  - ch.ts) > 5*60;
     }
+    let getTimeKbn = ts => {
+        let d=new Date(ts*1000);
+        let h=d.getHours();
+        return d.toLocaleDateString("ja-JP", {year: "numeric",month: "2-digit",day: "2-digit"}) + " " + (h<15?0 : h<19?1 : h<23?2 : 3);
+    }
+    let isTooOld = ts => new Date().getTime()/1000 - ts > 60*60*24;
 
     let obsMessage;
     let obsMessageElm;
@@ -173,30 +185,27 @@ let wait = async(t) => await new Promise(resolve => setTimeout(resolve, t));
             let elm=elms[elms.length-1]; // 最新のメッセージ
             let mentorElms=elms.filter(e=>query("[data-message-sender]",e)[0].textContent.startsWith("mentor"));
             let mentorElm=mentorElms.length?mentorElms[mentorElms.length-1]:null; // メンターが送った最新のメッセージ
-            let ch=digCh(cn);
-            let updated=false;
-            if(mentorElm && ch.mentorts<ts(mentorElm)) {
-                ch.mentor=sender(mentorElm);
-                ch.mentorts=ts(mentorElm);
-                updated=true;
-            }
-            if(ch.ts<ts(elm)) {
-                ch.ts=ts(elm);
-                ch.sender=sender(elm);
-                updated=true;
-            }
-            if(updated) {
-                ch.isLastMentor=(elm==mentorElm);
-                ch.isSolved=false;
-                let getTimeKbn = ts => {
-                    let d=new Date(ts*1000);
-                    let h=d.getHours();
-                    return d.toLocaleDateString("ja-JP", {year: "numeric",month: "2-digit",day: "2-digit"}) + " " + (h<15?0 : h<19?1 : h<23?2 : 3);
-                }
-                ch.isNewcomer=(ch.mentorts==0 || getTimeKbn(ch.ts)!=getTimeKbn(ch.mentorts));
-                updateIsTimeout(channelNameElm);
-                updateSide(channelNameElm);
-                saveLocalStorage();
+            if(!isTooOld(ts(elm))) {
+                let ch=digCh(cn);
+                updateSideAndSaveIfChange(channelNameElm,ch,()=>{
+                    let updated=false;
+                    if(mentorElm && ch.mentorts<ts(mentorElm)) {
+                        ch.mentor=sender(mentorElm);
+                        ch.mentorts=ts(mentorElm);
+                        updated=true;
+                    }
+                    if(ch.ts<ts(elm)) {
+                        ch.ts=ts(elm);
+                        ch.sender=sender(elm);
+                        updated=true;
+                    }
+                    if(updated) {
+                        ch.isLastMentor=(elm==mentorElm);
+                        ch.isSolved=false;
+                        ch.isNewcomer=(ch.mentorts==0 || getTimeKbn(ch.ts)!=getTimeKbn(ch.mentorts));
+                        updateIsTimeout(ch);
+                    }
+                });
             }
         }
     };
@@ -223,10 +232,25 @@ let wait = async(t) => await new Promise(resolve => setTimeout(resolve, t));
             obsSide.observe(obsSideElm, {childList:true})
         }
 
-        let elms = query(".p-channel_sidebar__name");
-        for(let elm of elms) {
-            updateIsTimeout(elm);
-            updateSide(elm);
+        for(let cn of Object.keys(data)) {
+            let ch=data[cn];
+            if(!ch.isWarning && isTooOld(ch.ts)) {
+                delete data[cn];
+                let elm=query(".p-channel_sidebar__name").filter(e=>e.textContent==cn)[0];
+                if(elm) {
+                    query(".ta__channel-panel",elm.parentElement)[0].remove();
+                }
+            }
+        }
+
+        let k=getTimeKbn(new Date().getTime()/1000);
+        for(let cn of Object.keys(data)) {
+            let ch=data[cn];
+            let elm=query(".p-channel_sidebar__name").filter(e=>e.textContent==cn)[0];
+            updateSideAndSaveIfChange(elm,ch,()=>{
+                updateIsTimeout(ch);
+                ch.isOtherTimeKbn=(k!=getTimeKbn(ch.ts));
+            });
         }
     }, 3000); // たまにオブザーバー外れてしまうので定期的につける
     await wait(3000);
