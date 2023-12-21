@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Slack見落としチェッカー
 // @namespace    http://tampermonkey.net/
-// @version      0.2
+// @version      0.3
 // @description  try to take over the world!
 // @author       You
 // @match        https://app.slack.com/*
@@ -14,6 +14,13 @@
 
 let wait = async(t) => await new Promise(resolve => setTimeout(resolve, t));
 (async function () {
+    let addShortCut = (ctrlKey, shiftKey, altKey, code, f) => {
+        document.addEventListener("keydown", async (e) => {
+            if(e.ctrlKey == ctrlKey && e.shiftKey == shiftKey && e.altKey == altKey && e.code.toLowerCase() == code.toLowerCase()) {
+                await f();
+            }
+        });
+    }
     let query = (selector,elm=document) => Array.from(elm.querySelectorAll(selector));
     let init = () => {
         let stl=document.createElement("style");
@@ -225,5 +232,19 @@ let wait = async(t) => await new Promise(resolve => setTimeout(resolve, t));
     await wait(3000);
     init();
     updateSideAll();
+
+    let toggleStar = async () => {
+        document.querySelector(".p-view_header__channel_title").click();
+        await wait(500);
+        document.querySelector(".p-about_modal__header .c-icon--star, .p-about_modal__header .c-icon--star-o").click();
+        await wait(200);
+        document.querySelector("[data-qa='sk_close_modal_button']").click();
+    }
+    let openUrl = () => {
+        let url=document.querySelector(".p-classic_nav__model__title__info__topic__text a").href;
+        window.open(url, "student");
+    }
+    addShortCut(true, false, false, "keys", toggleStar);
+    addShortCut(true, false, false, "keyu", openUrl);
 })();
 
