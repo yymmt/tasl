@@ -147,9 +147,7 @@ let wait = async(t) => await new Promise(resolve => setTimeout(resolve, t));
         let cn=elm.textContent;
         let ch=data[cn];
         if(ch) {
-            if(!ch.isTimeout && !ch.isSolved && ((new Date().getTime()/1000  - ch.ts) > 5*60)) {
-                ch.isTimeout=true;
-            }
+            ch.isTimeout=ch.isSolved?false : (new Date().getTime()/1000  - ch.ts) > 5*60;
         }
     }
 
