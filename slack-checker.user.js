@@ -219,6 +219,7 @@ let wait = async(t) => await new Promise(resolve => setTimeout(resolve, t));
         let elms = query(".p-channel_sidebar__name");
         for(let elm of elms) {
             updateIsTimeout(elm);
+            updateSide(elm);
         }
     }, 3000); // たまにオブザーバー外れてしまうので定期的につける
     await wait(3000);
