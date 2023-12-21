@@ -117,6 +117,7 @@ let wait = async(t) => await new Promise(resolve => setTimeout(resolve, t));
                     query(sel,panel)[0].addEventListener("click",e=>{
                         f();
                         updateSide(elm);
+                        saveLocalStorage();
                     });
                 }
                 onclick(".ta__unsolved-icon",()=>{ ch.isSolved=false; updateIsTimeout(elm); });
