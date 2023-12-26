@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Slack見落としチェッカー
 // @namespace    http://tampermonkey.net/
-// @version      0.3
+// @version      0.4
 // @description  try to take over the world!
 // @author       You
-// @match        https://app.slack.com/*
+// @match        https://app.slack.com/client/T02CXU5S59P/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=slack.com
 // @grant        none
 // @updateURL    https://raw.githubusercontent.com/yymmt/tasl/main/slack-checker.user.js
@@ -22,6 +22,7 @@ let wait = async(t) => await new Promise(resolve => setTimeout(resolve, t));
         });
     }
     let query = (selector,elm=document) => Array.from(elm.querySelectorAll(selector));
+    let summary=document.createElement("div");
     let init = () => {
         let stl=document.createElement("style");
         stl.innerHTML=`
@@ -91,12 +92,83 @@ let wait = async(t) => await new Promise(resolve => setTimeout(resolve, t));
                 height: 12px;
                 margin-top: 0px;
             }
+            .ta__summary {
+                position: absolute;
+                top: 3px;
+                right: 3px;
+                background: white;
+                font-size: 12px;
+                z-index: 100;
+                padding: 4px;
+                border-radius: 4px;
+                border: 1px solid lightgray;
+                transition: 0.5s all ease;
+            }
+            .ta__summary.ta__hide {
+                transform: translateY(calc(-100% + 4px));
+            }
+            .ta__summary h6 {
+                font-size: 100%;
+                font-weight: bold;
+            }
+            .ta__summary__mentor-name {
+                margin-left: 10px;
+                font-weight: bold;
+            }
+            .ta__summary ul {
+                list-style: none;
+                margin-left: 20px;
+                margin-bottom: 0;
+            }
+            .ta__summary li {
+                margin-bottom: 0;
+                position: relative;
+            }
+            .ta__summary li .ta__remove-line {
+                position: absolute;
+                right: 0px;
+                top: 0px;
+                cursor: pointer;
+            }
+            .ta__summary img {
+                width: 12px;
+            }
+            .ta__hide-button {
+                position: absolute;
+                right: 0px;
+                top: 0px;
+                padding: 0px 6px;
+                cursor: pointer;
+            }
         `;
         document.body.append(stl);
+        summary.classList.add("ta__summary");
+        summary.innerHTML=`
+            <h6>質問チャンネル</h6>
+            <div class='ta__summary__channel'></div>
+            <h6>課題レビュー</h6>
+            <div class='ta__summary__review'></div>
+            <h6>課題レビュー残<small class='ta__summary__review-left-mintime'></small></h6>
+            <div class='ta__summary__review-left'></div>
+            <span class="ta__hide-button">×</span>
+        `;
+        summary.addEventListener("click", e=>{
+            if(summary.classList.contains("ta__hide")) {
+                summary.classList.remove("ta__hide");
+            }
+        });
+        query(".ta__hide-button",summary)[0].addEventListener("click", e=>{
+            summary.classList.add("ta__hide");
+            e.stopPropagation();
+        });
+        document.body.append(summary);
     }
 
     let data = localStorage.getItem("techacademy-senderchecker");
     data = data ? JSON.parse(data) : {};
+    let reviewData = {};
+    let reviewUrlPrefix="https://techacademy.jp/mentor/reports/";
+    let iconUrlPrefix="https://raw.githubusercontent.com/yymmt/tasl/main/icon/";
     let saveLocalStorage = ()=>localStorage.setItem("techacademy-senderchecker", JSON.stringify(data));
     let digCh = (cn) => {
         if(!data[cn]) data[cn]={sender:"", mentor:"", ts:0, mentorts:0};
@@ -112,15 +184,15 @@ let wait = async(t) => await new Promise(resolve => setTimeout(resolve, t));
                 panel = document.createElement("span");
                 panel.classList.add("ta__channel-panel");
                 panel.innerHTML = `
-                    <img src="https://raw.githubusercontent.com/yymmt/tasl/main/icon/Exit.png" alt="本日ご新規(15時か19時をまたいで最初の発言)" class="ta__newcomer-icon">
-                    <img src="https://raw.githubusercontent.com/yymmt/tasl/main/icon/People.png" alt="最後に受講生が発言した" class="ta__student-icon">
-                    <img src="https://raw.githubusercontent.com/yymmt/tasl/main/icon/Boss.png" alt="最後にメンターが発言した" class="ta__mentor-icon">
+                    <img src="${iconUrlPrefix}Exit.png" class="ta__newcomer-icon">
+                    <img src="${iconUrlPrefix}People.png" class="ta__student-icon">
+                    <img src="${iconUrlPrefix}Boss.png" class="ta__mentor-icon">
                     <span class="ta__mentor-name"></span>
-                    <img src="https://raw.githubusercontent.com/yymmt/tasl/main/icon/Question.png" alt="未判定" class="ta__unsolved-icon ta__clickable">
-                    <img src="https://raw.githubusercontent.com/yymmt/tasl/main/icon/Apply.png" alt="会話が完結" class="ta__solved-icon ta__clickable">
+                    <img src="${iconUrlPrefix}Question.png" class="ta__unsolved-icon ta__clickable">
+                    <img src="${iconUrlPrefix}Apply.png" class="ta__solved-icon ta__clickable">
                     <span class="ta__small-icons">
-                        <img src="https://raw.githubusercontent.com/yymmt/tasl/main/icon/Hourglass.png" alt="未判定から5分経過" class="ta__timeout-icon">
-                        <img src="https://raw.githubusercontent.com/yymmt/tasl/main/icon/Alert.png" alt="注意" class="ta__warning-icon ta__clickable">
+                        <img src="${iconUrlPrefix}Hourglass.png" class="ta__timeout-icon">
+                        <img src="${iconUrlPrefix}Alert.png" class="ta__warning-icon ta__clickable">
                     </span>
                 `;
                 let onclick = (sel,f) => {
@@ -153,6 +225,7 @@ let wait = async(t) => await new Promise(resolve => setTimeout(resolve, t));
         if(Object.keys(ch).some(k=>ch[k]!=bk[k])) {
             if(elm) { updateSide(elm); }
             saveLocalStorage();
+            updateSummary();
         }
     }
     let updateSideAll = () => {
@@ -160,6 +233,7 @@ let wait = async(t) => await new Promise(resolve => setTimeout(resolve, t));
         for(let elm of elms) {
             updateSide(elm);
         }
+        updateSummary();
     }
     let updateIsTimeout = ch => {
         ch.isTimeout=ch.isSolved?false : (new Date().getTime()/1000  - ch.ts) > 5*60;
@@ -170,43 +244,155 @@ let wait = async(t) => await new Promise(resolve => setTimeout(resolve, t));
         return d.toLocaleDateString("ja-JP", {year: "numeric",month: "2-digit",day: "2-digit"}) + " " + (h<15?0 : h<19?1 : h<23?2 : 3);
     }
     let isTooOld = ts => new Date().getTime()/1000 - ts > 60*60*24;
+    let updateSummary = () => {
+        let tsToHhmm = ts => (new Date(ts*1000)).toLocaleTimeString("ja-JP").replace(/:\d+$/,"");
+        let elm=query(".ta__summary__channel")[0];
+        elm.innerHTML='';
+        let sameTimeKbnDataList = {};
+        for(let cn of Object.keys(data)) {
+            let ch=data[cn];
+            if(!ch.isOtherTimeKbn) {
+                let mentor=ch.mentor;
+                if(!sameTimeKbnDataList[mentor]) sameTimeKbnDataList[mentor]=[];
+                sameTimeKbnDataList[mentor].push({...ch, cn});
+            }
+        }
+        for(let mentor of Object.keys(sameTimeKbnDataList)) {
+            let sameTimeKbnData=sameTimeKbnDataList[mentor];
+            let visibleData=sameTimeKbnData.filter(ch=>!ch.isSolved); // 未解決を抽出
+            if(!visibleData.length) {
+                visibleData.push(sameTimeKbnData.filter(ch=>ch.isSolved).reduce((a,b)=>a.ts>b.ts?a:b)); // 未解決が無ければ解決の最新のみ抽出
+            }
+            visibleData.sort((a,b)=>b.ts-a.ts); // メッセージ時刻の降順でソート
+
+            let e=document.createElement("div");
+            e.innerHTML=`
+                <div class='ta__summary__mentor-name'>${mentor.replace(/mentor-/,"")}</div>
+                <ul>
+                    ${visibleData.map(ch=>`<li>
+                        ${tsToHhmm(ch.ts)}
+                        <img src="${iconUrlPrefix}${ch.isSolved?'Apply':'Question'}.png">
+                        ${ch.cn}
+                    </li>`).join("")}
+                </ul>
+            `;
+            elm.append(e);
+        }
+
+        elm=query(".ta__summary__review")[0];
+        elm.innerHTML='';
+        let leftReview=[];
+        let reviewPerMentor = {};
+        let mintime=2145711600; // ← 2037-12-30 00:00:00
+        let k=getTimeKbn(new Date().getTime()/1000);
+        for(let repid of Object.keys(reviewData)) {
+            let rv = reviewData[repid];
+            if(rv.isRemoved) continue;
+            if(mintime>rv.ts) mintime=rv.ts;
+            if(rv.mentor) {
+                if(k==getTimeKbn(rv.ts)) {
+                    if(!reviewPerMentor[rv.mentor] || reviewPerMentor[rv.mentor].ts<rv.ts) {
+                        reviewPerMentor[rv.mentor]=rv;
+                    }
+                }
+            } else {
+                leftReview.push(rv);
+            }
+        }
+        for(let mentor of Object.keys(reviewPerMentor)) {
+            let rv = reviewPerMentor[mentor];
+            let e=document.createElement("div");
+            e.innerHTML=`
+                <div class='ta__summary__mentor-name'>${rv.mentor}</div>
+                <ul>
+                    <li>${tsToHhmm(rv.ts)} <a href='${reviewUrlPrefix}${rv.repid}' target='review'>${rv.student}</a></li>
+                </ul>
+            `;
+            elm.append(e);
+        }
+
+        elm=query(".ta__summary__review-left")[0];
+        elm.innerHTML='';
+        if(leftReview.length) {
+            let rep=new RegExp("([\\d_\\s]|質問)","g");
+            let alert = student => Object.keys(data).some(cn=>cn.replace(rep,"") == student.replace(rep,"") && data[cn].isWarning)?`<img src="${iconUrlPrefix}Alert.png">`:"";
+            let e=document.createElement("ul");
+            e.innerHTML=leftReview.map(rv=>`
+                <li data-repid='${rv.repid}'><a href='${reviewUrlPrefix}${rv.repid}' target='review'>${rv.student}</a>${alert(rv.student)}<span class="ta__remove-line">×</span></li>
+            `).join("");
+            query(".ta__remove-line",e).forEach(r=>{
+                r.addEventListener("click", eve=>{
+                    let repid=eve.target.parentElement.getAttribute("data-repid");
+                    reviewData[repid].isRemoved=true;
+                    updateSummary();
+                });
+            })
+            elm.append(e);
+        } else if(!Object.keys(reviewData).length) {
+            elm.innerHTML='<ul><li>未判定<small>(alertチャンネルを開いてください)</small></li></ul>';
+        } else {
+            elm.innerHTML=`<ul>
+                <li>(なし)</li>
+                <li><small><a href='https://techacademy.jp/mentor/all/reports?utf8=%E2%9C%93&courses%5B%5D=first-sidejob&courses%5B%5D=web-production-mom&commit=%E3%82%B3%E3%83%BC%E3%82%B9%E3%82%92%E7%B5%9E%E3%82%8A%E8%BE%BC%E3%82%80' target='review'>全期間を確認</a></small></li>
+            </ul>`;
+        }
+        query(".ta__summary__review-left-mintime")[0].textContent=`(${tsToHhmm(mintime)}以降)`;
+    }
 
     let obsMessage;
     let obsMessageElm;
     let obsMessageFunc = async (records) => {
         let channelNameElm = query(".p-channel_sidebar__channel--selected .p-channel_sidebar__name")[0];
         let cn=channelNameElm.textContent;
-        if(!cn.match(/質問/)) { return; }
-        let elms=query(".p-message_pane_message__message")
-            .filter(e=>query("[data-message-sender]",e)[0] && query("[data-ts]",e)[0]);
-        if(elms.length) {
-            let ts=e=>parseFloat(query("[data-ts]",e)[0].getAttribute("data-ts"));
-            let sender=e=>e?query("[data-message-sender]",e)[0].textContent:"";
-            let elm=elms[elms.length-1]; // 最新のメッセージ
-            let mentorElms=elms.filter(e=>query("[data-message-sender]",e)[0].textContent.startsWith("mentor"));
-            let mentorElm=mentorElms.length?mentorElms[mentorElms.length-1]:null; // メンターが送った最新のメッセージ
-            if(!isTooOld(ts(elm))) {
-                let ch=digCh(cn);
-                updateSideAndSaveIfChange(channelNameElm,ch,()=>{
-                    let updated=false;
-                    if(mentorElm && ch.mentorts<ts(mentorElm)) {
-                        ch.mentor=sender(mentorElm);
-                        ch.mentorts=ts(mentorElm);
-                        updated=true;
-                    }
-                    if(ch.ts<ts(elm)) {
-                        ch.ts=ts(elm);
-                        ch.sender=sender(elm);
-                        updated=true;
-                    }
-                    if(updated) {
-                        ch.isLastMentor=(elm==mentorElm);
-                        ch.isSolved=false;
-                        ch.isNewcomer=(ch.mentorts==0 || getTimeKbn(ch.ts)!=getTimeKbn(ch.mentorts));
-                        updateIsTimeout(ch);
-                    }
-                });
+        if(cn.match(/質問/)) {
+            let elms=query(".p-message_pane_message__message")
+                .filter(e=>query("[data-message-sender]",e)[0] && !query("[data-message-sender]",e)[0].textContent.includes("support") && query("[data-ts]",e)[0] && query(".c-message_kit__blocks",e)[0]);
+            if(elms.length) {
+                let ts=e=>parseFloat(query("[data-ts]",e)[0].getAttribute("data-ts"));
+                let sender=e=>e?query("[data-message-sender]",e)[0].textContent:"";
+                let elm=elms[elms.length-1]; // 最新のメッセージ
+                let mentorElms=elms.filter(e=>query("[data-message-sender]",e)[0].textContent.startsWith("mentor"));
+                let mentorElm=mentorElms.length?mentorElms[mentorElms.length-1]:null; // メンターが送った最新のメッセージ
+                if(!isTooOld(ts(elm))) {
+                    let ch=digCh(cn);
+                    updateSideAndSaveIfChange(channelNameElm,ch,()=>{
+                        let updated=false;
+                        if(mentorElm && ch.mentorts<ts(mentorElm)) {
+                            ch.mentor=sender(mentorElm);
+                            ch.mentorts=ts(mentorElm);
+                            updated=true;
+                        }
+                        if(ch.ts<ts(elm)) {
+                            ch.ts=ts(elm);
+                            ch.sender=sender(elm);
+                            updated=true;
+                        }
+                        if(updated) {
+                            ch.isLastMentor=(elm==mentorElm);
+                            ch.isSolved=false;
+                            ch.isNewcomer=(ch.mentorts==0 || getTimeKbn(ch.ts)!=getTimeKbn(ch.mentorts));
+                            updateIsTimeout(ch);
+                        }
+                    });
+                }
             }
+        } else {
+            let elms=query(".p-message_pane_message__message")
+                .filter(e=>query("[data-ts]",e)[0] && query(".p-rich_text_section",e)[0]);
+            let ts=e=>parseFloat(query("[data-ts]",e)[0].getAttribute("data-ts"));
+            for(let elm of elms) {
+                let match=query(".p-rich_text_section",elm)[0].textContent.match(/(.*)さんの課題を(.*)さんがレビュー中.*reports\/(\d+)/);
+                if(match) {
+                    let [m,student,mentor,repid] = match;
+                    reviewData[repid] = Object.assign(reviewData[repid]||{},{student,mentor,ts:ts(elm),repid});
+                }
+                match=query(".p-rich_text_section",elm)[0].textContent.match(/(.*)さんが.*提出.*reports\/(\d+)/);
+                if(match) {
+                    let [m,student,repid] = match;
+                    reviewData[repid] = Object.assign(reviewData[repid]||{},{student,ts:ts(elm),repid});
+                }
+            }
+            updateSummary();
         }
     };
     let obsSide;
