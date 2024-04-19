@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Slack見落としチェッカー
 // @namespace    http://tampermonkey.net/
-// @version      0.4
+// @version      0.5
 // @description  try to take over the world!
 // @author       You
 // @match        https://app.slack.com/client/T02CXU5S59P/*
@@ -103,16 +103,13 @@ let wait = async(t) => await new Promise(resolve => setTimeout(resolve, t));
                 border-radius: 4px;
                 border: 1px solid lightgray;
                 transition: 0.5s all ease;
+                min-width: 160px;
             }
             .ta__summary.ta__hide {
                 transform: translateY(calc(-100% + 4px));
             }
             .ta__summary h6 {
                 font-size: 100%;
-                font-weight: bold;
-            }
-            .ta__summary__mentor-name {
-                margin-left: 10px;
                 font-weight: bold;
             }
             .ta__summary ul {
@@ -144,10 +141,6 @@ let wait = async(t) => await new Promise(resolve => setTimeout(resolve, t));
         document.body.append(stl);
         summary.classList.add("ta__summary");
         summary.innerHTML=`
-            <h6>質問チャンネル</h6>
-            <div class='ta__summary__channel'></div>
-            <h6>課題レビュー</h6>
-            <div class='ta__summary__review'></div>
             <h6>課題レビュー残<small class='ta__summary__review-left-mintime'></small></h6>
             <div class='ta__summary__review-left'></div>
             <span class="ta__hide-button">×</span>
@@ -246,72 +239,19 @@ let wait = async(t) => await new Promise(resolve => setTimeout(resolve, t));
     let isTooOld = ts => new Date().getTime()/1000 - ts > 60*60*24;
     let updateSummary = () => {
         let tsToHhmm = ts => (new Date(ts*1000)).toLocaleTimeString("ja-JP").replace(/:\d+$/,"");
-        let elm=query(".ta__summary__channel")[0];
-        elm.innerHTML='';
-        let sameTimeKbnDataList = {};
-        for(let cn of Object.keys(data)) {
-            let ch=data[cn];
-            if(!ch.isOtherTimeKbn) {
-                let mentor=ch.mentor;
-                if(!sameTimeKbnDataList[mentor]) sameTimeKbnDataList[mentor]=[];
-                sameTimeKbnDataList[mentor].push({...ch, cn});
-            }
-        }
-        for(let mentor of Object.keys(sameTimeKbnDataList)) {
-            let sameTimeKbnData=sameTimeKbnDataList[mentor];
-            let visibleData=sameTimeKbnData.filter(ch=>!ch.isSolved); // 未解決を抽出
-            if(!visibleData.length) {
-                visibleData.push(sameTimeKbnData.filter(ch=>ch.isSolved).reduce((a,b)=>a.ts>b.ts?a:b)); // 未解決が無ければ解決の最新のみ抽出
-            }
-            visibleData.sort((a,b)=>b.ts-a.ts); // メッセージ時刻の降順でソート
 
-            let e=document.createElement("div");
-            e.innerHTML=`
-                <div class='ta__summary__mentor-name'>${mentor.replace(/mentor-/,"")}</div>
-                <ul>
-                    ${visibleData.map(ch=>`<li>
-                        ${tsToHhmm(ch.ts)}
-                        <img src="${iconUrlPrefix}${ch.isSolved?'Apply':'Question'}.png">
-                        ${ch.cn}
-                    </li>`).join("")}
-                </ul>
-            `;
-            elm.append(e);
-        }
-
-        elm=query(".ta__summary__review")[0];
-        elm.innerHTML='';
         let leftReview=[];
-        let reviewPerMentor = {};
         let mintime=2145711600; // ← 2037-12-30 00:00:00
-        let k=getTimeKbn(new Date().getTime()/1000);
         for(let repid of Object.keys(reviewData)) {
             let rv = reviewData[repid];
             if(rv.isRemoved) continue;
             if(mintime>rv.ts) mintime=rv.ts;
-            if(rv.mentor) {
-                if(k==getTimeKbn(rv.ts)) {
-                    if(!reviewPerMentor[rv.mentor] || reviewPerMentor[rv.mentor].ts<rv.ts) {
-                        reviewPerMentor[rv.mentor]=rv;
-                    }
-                }
-            } else {
+            if(!rv.mentor) {
                 leftReview.push(rv);
             }
         }
-        for(let mentor of Object.keys(reviewPerMentor)) {
-            let rv = reviewPerMentor[mentor];
-            let e=document.createElement("div");
-            e.innerHTML=`
-                <div class='ta__summary__mentor-name'>${rv.mentor}</div>
-                <ul>
-                    <li>${tsToHhmm(rv.ts)} <a href='${reviewUrlPrefix}${rv.repid}' target='review'>${rv.student}</a></li>
-                </ul>
-            `;
-            elm.append(e);
-        }
 
-        elm=query(".ta__summary__review-left")[0];
+        let elm=query(".ta__summary__review-left")[0];
         elm.innerHTML='';
         if(leftReview.length) {
             let rep=new RegExp("([\\d_\\s]|質問)","g");
@@ -328,15 +268,16 @@ let wait = async(t) => await new Promise(resolve => setTimeout(resolve, t));
                 });
             })
             elm.append(e);
+            query(".ta__summary__review-left-mintime")[0].textContent=`(${tsToHhmm(mintime)}以降)`;
         } else if(!Object.keys(reviewData).length) {
             elm.innerHTML='<ul><li>未判定<small>(alertチャンネルを開いてください)</small></li></ul>';
+            query(".ta__summary__review-left-mintime")[0].textContent=``;
         } else {
             elm.innerHTML=`<ul>
-                <li>(なし)</li>
                 <li><small><a href='https://techacademy.jp/mentor/all/reports?utf8=%E2%9C%93&courses%5B%5D=first-sidejob&courses%5B%5D=web-production-mom&commit=%E3%82%B3%E3%83%BC%E3%82%B9%E3%82%92%E7%B5%9E%E3%82%8A%E8%BE%BC%E3%82%80' target='review'>全期間を確認</a></small></li>
             </ul>`;
+            query(".ta__summary__review-left-mintime")[0].textContent=`(なし)`;
         }
-        query(".ta__summary__review-left-mintime")[0].textContent=`(${tsToHhmm(mintime)}以降)`;
     }
 
     let obsMessage;
@@ -381,10 +322,10 @@ let wait = async(t) => await new Promise(resolve => setTimeout(resolve, t));
                 .filter(e=>query("[data-ts]",e)[0] && query(".p-rich_text_section",e)[0]);
             let ts=e=>parseFloat(query("[data-ts]",e)[0].getAttribute("data-ts"));
             for(let elm of elms) {
-                let match=query(".p-rich_text_section",elm)[0].textContent.match(/(.*)さんの課題を(.*)さんがレビュー中.*reports\/(\d+)/);
+                let match=query(".p-rich_text_section",elm)[0].textContent.match(/(.*)さんの課題ステータスがレビュー中.*reports\/(\d+)/);
                 if(match) {
-                    let [m,student,mentor,repid] = match;
-                    reviewData[repid] = Object.assign(reviewData[repid]||{},{student,mentor,ts:ts(elm),repid});
+                    let [m,student,repid] = match;
+                    reviewData[repid] = Object.assign(reviewData[repid]||{},{student,mentor:'DUMMY',ts:ts(elm),repid});
                 }
                 match=query(".p-rich_text_section",elm)[0].textContent.match(/(.*)さんが.*提出.*reports\/(\d+)/);
                 if(match) {
