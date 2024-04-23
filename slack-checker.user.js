@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Slack見落としチェッカー
 // @namespace    http://tampermonkey.net/
-// @version      0.5
+// @version      0.6
 // @description  try to take over the world!
 // @author       You
 // @match        https://app.slack.com/client/T02CXU5S59P/*
@@ -322,7 +322,7 @@ let wait = async(t) => await new Promise(resolve => setTimeout(resolve, t));
                 .filter(e=>query("[data-ts]",e)[0] && query(".p-rich_text_section",e)[0]);
             let ts=e=>parseFloat(query("[data-ts]",e)[0].getAttribute("data-ts"));
             for(let elm of elms) {
-                let match=query(".p-rich_text_section",elm)[0].textContent.match(/(.*)さんの課題ステータスがレビュー中.*reports\/(\d+)/);
+                let match=query(".p-rich_text_section",elm)[0].textContent.match(/(.*)さんの課題のステータスがレビュー中.*reports\/(\d+)/);
                 if(match) {
                     let [m,student,repid] = match;
                     reviewData[repid] = Object.assign(reviewData[repid]||{},{student,mentor:'DUMMY',ts:ts(elm),repid});
