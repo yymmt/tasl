@@ -274,7 +274,7 @@ let wait = async(t) => await new Promise(resolve => setTimeout(resolve, t));
             query(".ta__summary__review-left-mintime")[0].textContent=``;
         } else {
             elm.innerHTML=`<ul>
-                <li><small><a href='https://techacademy.jp/mentor/all/reports?utf8=%E2%9C%93&courses%5B%5D=first-sidejob&courses%5B%5D=web-production-mom&commit=%E3%82%B3%E3%83%BC%E3%82%B9%E3%82%92%E7%B5%9E%E3%82%8A%E8%BE%BC%E3%82%80' target='review'>全期間を確認</a></small></li>
+                <li><small><a href='https://techacademy.jp/mentor/all/reports?utf8=%E2%9C%93&courses%5B%5D=first-sidejob&courses%5B%5D=web-production-mom&courses%5B%5D=first-sidejob-oneonone-plan&commit=%E3%82%B3%E3%83%BC%E3%82%B9%E3%82%92%E7%B5%9E%E3%82%8A%E8%BE%BC%E3%82%80' target='review'>全期間を確認</a></small></li>
             </ul>`;
             query(".ta__summary__review-left-mintime")[0].textContent=`(なし)`;
         }
