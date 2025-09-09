@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Slack見落としチェッカー
 // @namespace    http://tampermonkey.net/
-// @version      0.6
+// @version      0.7
 // @description  try to take over the world!
 // @author       You
 // @match        https://app.slack.com/client/T02CXU5S59P/*
@@ -283,6 +283,7 @@ let wait = async(t) => await new Promise(resolve => setTimeout(resolve, t));
     let obsMessage;
     let obsMessageElm;
     let obsMessageFunc = async (records) => {
+        await wait(200);
         let channelNameElm = query(".p-channel_sidebar__channel--selected .p-channel_sidebar__name")[0];
         let cn=channelNameElm.textContent;
         if(cn.match(/質問/)) {
